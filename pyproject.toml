@@ -1,0 +1,19 @@
+[project]
+name = "todo-mcp"
+version = "0.1.0"
+description = "A small local MCP server for creating and managing todos"
+authors = [
+    { name = "simon.plutz", email = "simon.plutz@zoi.tech" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "mcp[cli]>=2.1.1",
+]
+
+[project.scripts]
+todo-mcp = "todo_mcp.server:main"
+todo-mcp-inspect = "todo_mcp.inspect:main"
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12.0"]
+build-backend = "uv_build"
