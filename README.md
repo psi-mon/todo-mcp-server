@@ -2,7 +2,7 @@
 
 A small local [MCP](https://modelcontextprotocol.io) server for creating and managing todos. This is a learning project.
 
-Todos will live in `~/todos/todos.json` (added in later tasks). Right now the server only exposes a `hello_world` tool so you can confirm the setup.
+Todos live in `~/todos/todos.json` (created automatically on first `create_todo`). The server still exposes `hello_world` so you can confirm the connection.
 
 ## Tech stack
 
@@ -14,7 +14,7 @@ Todos will live in `~/todos/todos.json` (added in later tasks). Right now the se
 ## How the setup fits together
 
 1. **`uv`** creates `.venv`, installs `mcp`, and runs the `todo-mcp` console script from this project's environment. Clients should launch the server with `uv run` (or `uv --directory … run`) so they always use that environment — not system Python.
-2. **The SDK** turns decorated Python functions into MCP tools. `hello_world` is a normal function; the SDK publishes its name, docstring, and type hints as the tool schema.
+2. **The SDK** turns decorated Python functions into MCP tools. The function name is the tool name, the docstring is the description, and type hints become the JSON Schema the Inspector shows.
 3. **stdio** means this process does not open a port. The host (Inspector or Cursor) spawns `uv run todo-mcp` and exchanges MCP messages on stdin/stdout. Do not `print()` to stdout; that corrupts the protocol. Logging can go to stderr.
 4. **The Inspector** is a standalone MCP client with a UI. It starts your server as a subprocess, lists tools, and lets you call them. That is the acceptance check for this task.
 
@@ -83,6 +83,50 @@ npx --yes @modelcontextprotocol/inspector@v1-latest -- uv --directory /ABSOLUTE/
 4. Run it with no arguments (default name `World`) or pass `"name": "Inspector"`.
 5. The result should look like: `Hello, Inspector! The todo MCP server is running.`
 
+### Test `create_todo`
+
+After connecting, you should also see **`create_todo`** in Tools. The input schema has `name` (required string) and `description` (optional string). `status` and `flag` are **not** inputs; the server always writes `"todo"` and `false`.
+
+Use a throwaway name so you can repeat the duplicate-name case.
+
+1. **Happy path (name only).** Call `create_todo` with `"name": "buy milk"`. The result should be the full todo object, for example:
+
+   ```json
+   {
+     "name": "buy milk",
+     "status": "todo",
+     "flag": false
+   }
+   ```
+
+   `~/todos/todos.json` should now exist as a JSON array containing that object.
+
+2. **Optional description.** Call `create_todo` with `"name": "write report"` and `"description": "draft the intro"`. The result should include `"description": "draft the intro"` as well as `status` and `flag`.
+
+3. **Duplicate name.** Call `create_todo` again with `"name": "buy milk"`. The tool should fail with a clear error (`A todo named 'buy milk' already exists.`) and `todos.json` should still have only one item with that name.
+
+Leading/trailing spaces on `name` are trimmed. A blank name is rejected. If `todos.json` exists but is invalid JSON (or not an array), the tool errors instead of overwriting the file.
+
+Close the Inspector with **Ctrl+C** in the terminal that started it so ports 6274/6277 are freed before you start it again.
+
+## How `create_todo` is implemented (MCP tools)
+
+This is the Task 2 walkthrough, focused on MCP rather than the JSON file format.
+
+1. **Register a tool with `@mcp.tool()`.** In `src/todo_mcp/server.py`, `create_todo` is a normal Python function. The decorator publishes it on the server. Clients discover it via `tools/list`; the Inspector Tools tab is that list.
+
+2. **Name.** The Python function name **is** the MCP tool name (`create_todo`). That is what agents and the Inspector call.
+
+3. **Description.** The function docstring is the tool description sent to the model. It should say what the tool does, which arguments matter, and the uniqueness rule.
+
+4. **Input schema from type hints.** MCP does not use a hand-written JSON Schema here. `name: str` becomes a required string. `description: str | None = None` becomes an optional string. There are no `status` or `flag` parameters, so callers cannot set them on create.
+
+5. **Result.** The function returns a `Todo` dict (name, status, flag, and description when present). The SDK puts that in the tool result (`structured_content` plus a JSON text block). Returning the object — not only `"ok"` — lets the model see what was stored.
+
+6. **Anticipated errors.** Duplicate names, empty names, and a corrupt `todos.json` raise `ToolError`. The client gets `is_error=true` and the message. Other exceptions are treated as crashes and hide the details.
+
+File I/O lives in `src/todo_mcp/storage.py` (`TodoStore`) so the tool stays a thin MCP wrapper: validate/raise `ToolError`, return the todo. Persistence is `~/todos/todos.json` (a JSON array). The folder and file are created on first successful create.
+
 ## Use it in Cursor
 
 Add a stdio server entry to Cursor's MCP config. Project-level file: `.cursor/mcp.json`. User-level: Cursor Settings → MCP.
@@ -105,7 +149,7 @@ Add a stdio server entry to Cursor's MCP config. Project-level file: `.cursor/mc
 
 Use an absolute path for `--directory`. If Cursor cannot find `uv`, put the full path from `which uv` in `"command"` (often `/opt/homebrew/bin/uv` on Apple Silicon).
 
-After saving, reload MCP (or restart Cursor). `hello_world` should appear in the tool list. You can also ask the agent to call it.
+After saving, reload MCP (or restart Cursor). `hello_world` and `create_todo` should appear in the tool list. You can also ask the agent to call them.
 
 ## Use it in Claude Code
 
@@ -126,7 +170,7 @@ You should see a line like `Added stdio MCP server todo-mcp …`. Check the conn
 claude mcp list
 ```
 
-`todo-mcp` should show as connected. Then start a session (`claude`) and ask it to call `hello_world`. You can also open `/mcp` inside the session.
+`todo-mcp` should show as connected. Then start a session (`claude`) and ask it to call `hello_world` or `create_todo`. You can also open `/mcp` inside the session.
 
 **Scopes** (`-s` / `--scope`): `local` (default, this project, only you), `user` (all your projects), `project` (writes `.mcp.json` in the repo for the team). To remove it:
 
