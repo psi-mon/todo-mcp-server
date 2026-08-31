@@ -15,12 +15,12 @@ These apply to every task. Do not contradict them in later work without updating
 - **JSON shape:** a JSON array of todo objects
 - **Todo schema:**
 
-  | Field | Type | Notes |
-  |---|---|---|
-  | `name` | string | Required, unique, case-sensitive. Trim whitespace. Reject empty names. |
-  | `description` | string or omitted | Optional |
-  | `status` | `"todo"` or `"done"` | Always `"todo"` on create |
-  | `flag` | boolean | Generic boolean marker (e.g. important). Always `false` on create |
+  | Field         | Type                 | Notes                                                                  |
+  | ------------- | -------------------- | ---------------------------------------------------------------------- |
+  | `name`        | string               | Required, unique, case-sensitive. Trim whitespace. Reject empty names. |
+  | `description` | string or omitted    | Optional                                                               |
+  | `status`      | `"todo"` or `"done"` | Always `"todo"` on create                                              |
+  | `flag`        | boolean              | Generic boolean marker (e.g. important). Always `false` on create      |
 
 - **Names are unique.** Create fails if a todo with that name already exists. Task 3 looks up by exact name.
 - **Invalid file:** if `todos.json` exists but is not valid JSON (or not an array), tools/resources return a clear error instead of overwriting silently.
@@ -97,3 +97,40 @@ Both surfaces read the same `~/todos/todos.json`. Tools are for agents; resource
 - List tool and get-by-name tool
 - Resources so the user can `@` all todos and select one
 - Step-by-step guide focused on MCP resources vs tools (URIs, `list_resources`, templates, mime type)
+
+## Task 4: "Done" functionality for todos
+
+**Goal:** The user should be able to "mark" a todo as done and also to list all todos
+
+**Details:**
+When a todo is makred as "done" the status should change and it should be removed from `todos.json` and moved to `donedos.json`.
+If `donedos.json` does not exist is should be created.
+
+**Tools:**
+
+- `get_done_todos`: returns a list of all done todos.
+- `mark_done`: required `name`; removes a todo from the `todos.json` and moves it into `donedos.json` with the status 'done'
+
+**Key deliverables:**
+
+- implement all helper functions outside of `server.py`
+- in `server.py` add only comments where the new tools should be implemented and how
+
+## Task 5: "Flag" functionality for todos
+
+**Goal:** the user can flag a todo and list all flagged todos
+
+**Tools:** -`flag_todo`: required a `name`. sets the flag to true on this todo -`list_flagged_todos`: returns a list of all flagged todos
+
+**Resources (for `@` in Cursor)**
+
+- URI scheme: `flaggedTodo://`
+- `list_flagged_resources` returns **one resource per flagged todo**, e.g. `flaggedTodo://todo/{name}`, so the user can `@` and pick a specific todo
+- Also expose a list resource `flaggedTodo://todos` whose contents are the full JSON array
+- Reading `flaggedTodo://todo/{name}` returns that todo as `application/json` (full object)
+- Use a resource template `flaggedTodo://todo/{name}` so clients can complete names
+
+**Key deliverables:**
+
+- implement all helper functions outside of `server.py`
+- in `server.py` add only comments where the new tools should be implemented and how

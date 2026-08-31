@@ -109,6 +109,24 @@ Leading/trailing spaces on `name` are trimmed. A blank name is rejected. If `tod
 
 Close the Inspector with **Ctrl+C** in the terminal that started it so ports 6274/6277 are freed before you start it again.
 
+### Test `list_todos` and `get_todo` (Tools)
+
+1. **List todos (`list_todos`).** Open the Tools tab and run `list_todos` with no parameters. It returns a concise array of todos with `name`, `status`, and `flag` (descriptions omitted).
+2. **Get specific todo (`get_todo`).** Call `get_todo` with `"name": "buy milk"`. It returns the full todo object (including `description` if set).
+3. **Not found case.** Call `get_todo` with a non-existent name like `"does not exist"`. The tool fails with a clear not-found error.
+
+### Test Resources (`todo://todos` and `todo://todo/{name}`)
+
+1. **Collection resource (`todo://todos`).** Open the **Resources** tab in the Inspector. Select `todo://todos` and click Read. It displays the full JSON array of all todos (`mimeType: application/json`).
+2. **Individual resource (`todo://todo/{name}`).** Read `todo://todo/buy%20milk` (or `todo://todo/buy milk`). It returns the JSON object for that specific todo. If the todo does not exist, the server returns an invalid-params error (`-32602`).
+
+### Test Task 4: "Done" Functionality (`get_done_todos` and `mark_done`)
+
+1. **Mark a todo as done (`mark_done`).** Call `mark_done` with `"name": "buy milk"`. The item is removed from `~/todos/todos.json` and saved in `~/todos/donedos.json` with status `"done"`.
+2. **List done todos (`get_done_todos`).** Run `get_done_todos` to view all completed todos from `~/todos/donedos.json`.
+3. **Verify active list (`list_todos`).** Run `list_todos` to verify that `"buy milk"` is no longer in the active list.
+4. **Not found case.** Call `mark_done` with a todo name that is not in `todos.json` (e.g. `"nonexistent"`). It should raise a clear not-found error.
+
 ## How `create_todo` is implemented (MCP tools)
 
 This is the Task 2 walkthrough, focused on MCP rather than the JSON file format.
@@ -126,6 +144,29 @@ This is the Task 2 walkthrough, focused on MCP rather than the JSON file format.
 6. **Anticipated errors.** Duplicate names, empty names, and a corrupt `todos.json` raise `ToolError`. The client gets `is_error=true` and the message. Other exceptions are treated as crashes and hide the details.
 
 File I/O lives in `src/todo_mcp/storage.py` (`TodoStore`) so the tool stays a thin MCP wrapper: validate/raise `ToolError`, return the todo. Persistence is `~/todos/todos.json` (a JSON array). The folder and file are created on first successful create.
+
+## How Task 3 is implemented (MCP Resources vs Tools)
+
+### Tools vs Resources
+
+| Feature | MCP Tools | MCP Resources |
+|---|---|---|
+| **Target Audience** | Invoked autonomously by the LLM agent | Attached or selected by the user (via `@` in Cursor / Inspector) |
+| **Addressing** | Called by function name (e.g. `list_todos`, `get_todo`) | Identified by standard URIs (e.g. `todo://todos`, `todo://todo/{name}`) |
+| **Parameters** | Passed as typed arguments | Extracted from RFC 6570 URI templates |
+| **MIME Type** | JSON structured content + text | Declared content type (`application/json`, `text/plain`, etc.) |
+| **Error Signaling** | `ToolError` (returns `is_error=True`) | `ResourceNotFoundError` (`-32602`), `ResourceError` (`-32603`) |
+
+### Key Concepts in Task 3
+
+1. **Resource Templates (`@mcp.resource("todo://todo/{name}")`):**
+   The `{name}` parameter in the URI template automatically maps to the function argument `name: str`. The SDK parses and validates URI template parameters before invoking your handler.
+2. **Collection Resource (`@mcp.resource("todo://todos")`):**
+   A static URI without variables. Reading this resource returns the entire array of todos.
+3. **MIME Types:**
+   Setting `mime_type="application/json"` explicitly informs clients that the returned payload is JSON data rather than raw plain text.
+4. **Dynamic Resource Listing:**
+   When the user types `@` in an MCP host like Cursor, the client calls `resources/list`. Overriding `mcp.list_resources` dynamically returns individual `MCPResource` records for every item currently in `~/todos/todos.json`.
 
 ## Use it in Cursor
 
