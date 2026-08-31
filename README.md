@@ -180,3 +180,40 @@ claude mcp remove todo-mcp
 
 If it fails to connect, run the launch command yourself (`uv --directory "$(pwd)" run todo-mcp`). If that looks hung, stdio is working; if it errors, fix that before adding it again.
 
+## Use it in Antigravity (`agy`)
+
+Antigravity uses `mcp_config.json` to configure MCP servers. You can register `todo-mcp` globally across all projects or locally within a project workspace/plugin.
+
+### Global Configuration
+
+Add the server definition to your global MCP configuration at `~/.gemini/config/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "todo-mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/ABSOLUTE/PATH/TO/todo-mcp",
+        "run",
+        "todo-mcp"
+      ]
+    }
+  }
+}
+```
+
+> **Note:** Replace `/ABSOLUTE/PATH/TO/todo-mcp` with the absolute path to this repository (`pwd`). If `agy` cannot find `uv` on your PATH, specify the full path from `which uv` (e.g., `/opt/homebrew/bin/uv` or `~/.cargo/bin/uv`).
+
+### Workspace / Plugin Configuration
+
+To share the configuration with your project/team as an Antigravity plugin, place the config in `.agents/plugins/<plugin_name>/mcp_config.json`.
+
+### Verification
+
+1. Start or restart `agy` (or your Antigravity IDE / session).
+2. The agent automatically discovers `hello_world` and `create_todo` on startup.
+3. Prompt the agent to test the tools (e.g., *"Run hello_world from todo-mcp"* or *"Create a todo to buy milk"*).
+
+
