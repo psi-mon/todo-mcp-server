@@ -41,7 +41,7 @@ from mcp.server.mcpserver.exceptions import ResourceError, ResourceNotFoundError
 # ==============================================================================
 
 from todo_mcp.models import Todo, TodoListItem
-from todo_mcp.storage import TodoNotFoundError, TodoStorageError, get_all_mcp_resources, store
+from todo_mcp.storage import TodoNotFoundError, TodoStorageError, get_all_combined_mcp_resources, get_all_mcp_resources, store
 
 mcp = MCPServer(
     "todo-mcp",
@@ -139,23 +139,65 @@ def get_done_todos() -> list[Todo]:
 
 # --- 2. TOOL: mark_done -------------------------------------------------------
 #
-# TODO: Implement `mark_done` tool:
-# - Decorator: `@mcp.tool()`
-# - Signature: `def mark_done(name: str) -> Todo:`
-# - Docstring: Mark a todo as done. Removes it from todos.json and moves it into
-#              donedos.json with status 'done'.
-# - Implementation:
-#     try:
-#         return store.mark_done(name)
-#     except (TodoNotFoundError, TodoStorageError) as exc:
-#         raise ToolError(str(exc)) from exc
-#
+
 @mcp.tool()
 def mark_done(name: str) -> Todo:
     try:
         return store.mark_done(name)
     except (TodoNotFoundError, TodoStorageError) as exc:
         raise ToolError(str(exc)) from exc
+
+# ==============================================================================
+# TASK 5: "FLAG" FUNCTIONALITY FOR TODOS (TOOLS + RESOURCES)
+# ==============================================================================
+#
+# Goal: Allow users to flag a todo, list flagged todos, and expose flagged todos
+# as MCP resources under the `flaggedTodo://` URI scheme.
+#
+# --- 1. TOOLS (For Agent Invocation) -------------------------------------------
+
+@mcp.tool()
+def flag_todo(name: str) -> Todo:
+    try:
+        return store.flag_todo(name)
+    except (TodoNotFoundError, TodoStorageError) as exc:
+        raise ToolError(str(exc)) from exc
+
+@mcp.tool()
+def list_flagged_todos() -> list[Todo]:
+    try:
+        return store.list_flagged_todos()
+    except TodoStorageError as exc:
+        raise ToolError(str(exc)) from exc
+
+# --- 2. RESOURCES (For User `@` Mention & Direct Attachment) ------------------
+
+@mcp.resource("flaggedTodo://todos", mime_type="application/json")
+def get_flagged_todos_resource() -> list[Todo]:
+    try:
+        return store.list_flagged_todos()
+    except TodoStorageError as exc:
+        raise ResourceError(str(exc)) from exc
+
+@mcp.resource("flaggedTodo://todo/{name}", mime_type="application/json")
+def get_flagged_todo_resource(name: str) -> Todo:
+    try:
+        return store.get_flagged_todo(name)
+    except TodoNotFoundError as exc:
+        raise ResourceNotFoundError(str(exc)) from exc
+    except TodoStorageError as exc:
+        raise ResourceError(str(exc)) from exc
+
+# --- 3. DYNAMIC RESOURCE LISTING UPDATE ---------------------------------------
+#
+
+async def custom_list_resources():
+    try:
+        return get_all_combined_mcp_resources(store)
+    except TodoStorageError:
+        return []
+
+mcp.list_resources = custom_list_resources  # type: ignore[method-assign]
 
 # ==============================================================================
 

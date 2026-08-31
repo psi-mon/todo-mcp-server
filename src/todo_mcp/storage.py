@@ -13,6 +13,8 @@ DEFAULT_PATH = Path.home() / "todos" / "todos.json"
 DEFAULT_DONE_PATH = Path.home() / "todos" / "donedos.json"
 TODOS_URI = "todo://todos"
 TODO_TEMPLATE_URI = "todo://todo/{name}"
+FLAGGED_TODOS_URI = "flaggedTodo://todos"
+FLAGGED_TODO_TEMPLATE_URI = "flaggedTodo://todo/{name}"
 
 
 class TodoStorageError(Exception):
@@ -162,6 +164,39 @@ class TodoStore:
 
         return done_todo
 
+    def flag_todo(self, name: str) -> Todo:
+        """Set flag to True on the specified active todo.
+
+        Raises:
+            TodoNotFoundError: If no active todo matches the given name.
+            TodoStorageError: If reading or saving the file fails.
+        """
+        todos = self.load()
+        for todo in todos:
+            if todo["name"] == name:
+                todo["flag"] = True
+                self._save(todos)
+                return todo
+        raise TodoNotFoundError(f"Todo {name!r} not found in active todos.")
+
+    def list_flagged_todos(self) -> list[Todo]:
+        """Return all active todos that have flag set to True."""
+        todos = self.load()
+        return [todo for todo in todos if todo.get("flag") is True]
+
+    def get_flagged_todo(self, name: str) -> Todo:
+        """Get a single flagged todo by exact name.
+
+        Raises:
+            TodoNotFoundError: If no flagged todo matches the given name.
+            TodoStorageError: If reading the file fails.
+        """
+        flagged = self.list_flagged_todos()
+        for todo in flagged:
+            if todo["name"] == name:
+                return todo
+        raise TodoNotFoundError(f"Flagged todo {name!r} not found.")
+
     def _save(self, todos: list[Todo]) -> None:
         self._save_file(self.path, todos)
 
@@ -198,4 +233,41 @@ def get_all_mcp_resources(store_instance: TodoStore | None = None) -> list[MCPRe
     for todo in target_store.load():
         resources.append(format_todo_resource(todo))
     return resources
+
+
+def flagged_todo_to_resource_uri(name: str) -> str:
+    """Return the resource URI for a specific flagged todo."""
+    return f"flaggedTodo://todo/{name}"
+
+
+def format_flagged_todo_resource(todo: Todo) -> MCPResource:
+    """Create an MCPResource for a single flagged todo object."""
+    return MCPResource(
+        uri=flagged_todo_to_resource_uri(todo["name"]),
+        name=f"Flagged: {todo['name']}",
+        description=todo.get("description"),
+        mime_type="application/json",
+    )
+
+
+def get_all_flagged_mcp_resources(store_instance: TodoStore | None = None) -> list[MCPResource]:
+    """Return all flagged MCP resources (collection resource + individual flagged resources)."""
+    target_store = store_instance if store_instance is not None else store
+    resources: list[MCPResource] = [
+        MCPResource(
+            uri=FLAGGED_TODOS_URI,
+            name="All Flagged Todos",
+            description="Complete JSON array of all flagged todos in ~/todos/todos.json",
+            mime_type="application/json",
+        )
+    ]
+    for todo in target_store.list_flagged_todos():
+        resources.append(format_flagged_todo_resource(todo))
+    return resources
+
+
+def get_all_combined_mcp_resources(store_instance: TodoStore | None = None) -> list[MCPResource]:
+    """Return all regular and flagged MCP resources for Cursor @ discovery."""
+    target_store = store_instance if store_instance is not None else store
+    return get_all_mcp_resources(target_store) + get_all_flagged_mcp_resources(target_store)
 

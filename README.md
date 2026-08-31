@@ -127,6 +127,13 @@ Close the Inspector with **Ctrl+C** in the terminal that started it so ports 627
 3. **Verify active list (`list_todos`).** Run `list_todos` to verify that `"buy milk"` is no longer in the active list.
 4. **Not found case.** Call `mark_done` with a todo name that is not in `todos.json` (e.g. `"nonexistent"`). It should raise a clear not-found error.
 
+### Test Task 5: "Flag" Functionality (`flag_todo`, `list_flagged_todos`, and `flaggedTodo://` resources)
+
+1. **Flag a todo (`flag_todo`).** Call `flag_todo` with `"name": "buy milk"`. The item's `flag` field is updated to `true` in `~/todos/todos.json`.
+2. **List flagged todos (`list_flagged_todos`).** Run `list_flagged_todos` to return all active todos with `flag: true`.
+3. **Flagged collection resource (`flaggedTodo://todos`).** In the Resources tab, read `flaggedTodo://todos` to view the full array of flagged items.
+4. **Flagged individual resource (`flaggedTodo://todo/{name}`).** Read `flaggedTodo://todo/buy%20milk` (or `flaggedTodo://todo/buy milk`) to read the full object.
+
 ## How `create_todo` is implemented (MCP tools)
 
 This is the Task 2 walkthrough, focused on MCP rather than the JSON file format.
